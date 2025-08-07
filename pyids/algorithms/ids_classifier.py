@@ -55,7 +55,7 @@ class IDSClassifier:
                 antecedent_dict = dict(rule.car.antecedent)
                 counter = True
 
-                for name, value in row.iteritems():
+                for name, value in row.items():
                     if name in antecedent_dict:
                         rule_value = antecedent_dict[name]
 
@@ -88,7 +88,7 @@ class IDSClassifier:
                 antecedent_dict = dict(rule.car.antecedent)  
                 counter = True
 
-                for name, value in row.iteritems():
+                for name, value in row.items():
                     if name in antecedent_dict:
                         rule_value = antecedent_dict[name]
 
