@@ -55,7 +55,7 @@ class IDS:
             all_rules = IDSRuleSet(ids_rules)
             params.params["all_rules"] = all_rules
         elif self.ids_ruleset and not class_association_rules:
-            print("using provided ids ruleset and not class association rules")
+            #print("using provided ids ruleset and not class association rules")
             params.params["all_rules"] = self.ids_ruleset
 
         params.params["len_all_rules"] = len(params.params["all_rules"])
