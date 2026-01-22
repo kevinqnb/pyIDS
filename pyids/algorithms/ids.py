@@ -21,7 +21,7 @@ import numpy as np
 
 class IDS:
 
-    def __init__(self, algorithm="SLS"):
+    def __init__(self, n_select = None, algorithm="SLS"):
         self.clf: IDSClassifier = None
         self.cacher = None
         self.ids_ruleset = None
@@ -32,6 +32,7 @@ class IDS:
             RUSM=RandomizedUSMOptimizer
         )
 
+        self.n_select = n_select
         self.algorithm = algorithm
         self.logger = logging.getLogger(IDS.__name__)
 
@@ -74,6 +75,21 @@ class IDS:
         solution_set = optimizer.optimize()
 
         self.logger.debug("Solution set optimized")
+
+        # Filter rules by n_select using marginal contribution scores:
+        if self.n_select is not None and self.n_select < len(solution_set):
+            self.logger.debug(f"Filtering solution set to top {self.n_select} rules by marginal contribution scores")
+            rule_marginal_contributions = {}
+            total_score = objective_function.evaluate(IDSRuleSet(solution_set))
+            for rule in solution_set:
+                rules_without = IDSRuleSet(solution_set - {rule})
+                rule_marginal_contributions[rule] = total_score - objective_function.evaluate(rules_without)
+
+            # Sort rules by marginal contribution scores
+            sorted_rules = sorted(rule_marginal_contributions.items(), key=lambda item: item[1], reverse=True)
+            top_rules = [rule for rule, _ in sorted_rules[:self.n_select]]
+            solution_set = IDSRuleSet(top_rules)
+            self.logger.debug(f"Filtered solution set to {len(solution_set)} rules")
 
         self.clf = IDSClassifier(solution_set)
         self.clf.rules = sorted(self.clf.rules, reverse=True)
