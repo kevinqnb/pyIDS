@@ -87,8 +87,9 @@ class IDS:
 
             # Sort rules by marginal contribution scores
             sorted_rules = sorted(rule_marginal_contributions.items(), key=lambda item: item[1], reverse=True)
-            top_rules = [rule for rule, _ in sorted_rules[:self.n_select]]
+            top_rules = {rule for rule, _ in sorted_rules[:self.n_select]}
             solution_set = IDSRuleSet(top_rules)
+            solution_set = solution_set.ruleset
             self.logger.debug(f"Filtered solution set to {len(solution_set)} rules")
 
         self.clf = IDSClassifier(solution_set)
