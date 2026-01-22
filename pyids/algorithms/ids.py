@@ -76,19 +76,56 @@ class IDS:
 
         self.logger.debug("Solution set optimized")
 
-        # Filter rules by n_select using marginal contribution scores:
+        # Filter rules by n_select using iterative backward elimination:
         if self.n_select is not None and self.n_select < len(solution_set):
-            self.logger.debug(f"Filtering solution set to top {self.n_select} rules by marginal contribution scores")
-            rule_marginal_contributions = {}
-            total_score = objective_function.evaluate(IDSRuleSet(solution_set))
-            for rule in solution_set:
-                rules_without = IDSRuleSet(solution_set - {rule})
-                rule_marginal_contributions[rule] = total_score - objective_function.evaluate(rules_without)
+            self.logger.debug(
+                f"Filtering solution set to {self.n_select} rules using iterative backward elimination"
+            )
 
-            # Sort rules by marginal contribution scores
-            sorted_rules = sorted(rule_marginal_contributions.items(), key=lambda item: item[1], reverse=True)
-            top_rules = {rule for rule, _ in sorted_rules[:self.n_select]}
-            solution_set = IDSRuleSet(top_rules)
+            # Start from the full optimized solution and iteratively remove the least-useful rule.
+            # At each step we remove the rule whose removal results in the smallest decrease
+            # (or greatest increase) in the objective value.
+            current_set = set(solution_set)
+
+            # Defensive: if optimizer returns something not set-like.
+            if not isinstance(current_set, set):
+                current_set = set(list(solution_set))
+
+            # Iteratively remove until desired size is reached.
+            while len(current_set) > self.n_select:
+                # Evaluate current objective once per iteration.
+                current_score = objective_function.evaluate(IDSRuleSet(current_set))
+
+                best_rule_to_remove = None
+                best_score_after_removal = None
+                best_delta = None
+
+                # Find rule whose removal yields the best (highest) score after removal.
+                # Equivalently, remove the rule with the smallest marginal contribution.
+                for rule in current_set:
+                    candidate_set = current_set - {rule}
+                    candidate_score = objective_function.evaluate(IDSRuleSet(candidate_set))
+                    delta = current_score - candidate_score
+
+                    if best_score_after_removal is None or candidate_score > best_score_after_removal:
+                        best_rule_to_remove = rule
+                        best_score_after_removal = candidate_score
+                        best_delta = delta
+
+                # If something went wrong, break to avoid infinite loop.
+                if best_rule_to_remove is None:
+                    self.logger.warning(
+                        "Backward elimination could not identify a rule to remove; stopping early."
+                    )
+                    break
+
+                current_set.remove(best_rule_to_remove)
+                self.logger.debug(
+                    f"Backward elimination removed 1 rule (|S|={len(current_set)}), "
+                    f"delta={best_delta}, score_after={best_score_after_removal}"
+                )
+
+            solution_set = IDSRuleSet(current_set)
             solution_set = solution_set.ruleset
             self.logger.debug(f"Filtered solution set to {len(solution_set)} rules")
 
