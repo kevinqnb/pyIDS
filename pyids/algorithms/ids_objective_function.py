@@ -51,46 +51,36 @@ class IDSObjectiveFunction:
 
         return f1
 
+    def _solution_indices(self, solution_set: IDSRuleSet):
+        return [self.cacher.rule_index[r] for r in solution_set.ruleset]
+
     def f2(self, solution_set: IDSRuleSet):
-        overlap_intraclass_sum = 0
-
         quant_dataframe = self.objective_func_params.params["quant_dataframe"]
         len_all_rules = self.objective_func_params.params["len_all_rules"]
 
-        for i, r1 in enumerate(solution_set.ruleset):
-            for j, r2 in enumerate(solution_set.ruleset):
-                if i >= j:
-                    continue
+        indices = self._solution_indices(solution_set)
+        if len(indices) < 2:
+            intraclass_sum = 0
+        else:
+            sub_overlap = self.cacher.overlap_matrix[np.ix_(indices, indices)]
+            sub_same_class = self.cacher.same_class_matrix[np.ix_(indices, indices)]
+            intraclass_sum = int(np.sum(np.triu(sub_overlap * sub_same_class, k=1)))
 
-                if r1.car.consequent.value == r2.car.consequent.value:
-                    overlap_tmp = self.cacher.overlap(r1, r2)
+        return quant_dataframe.dataframe.shape[0] * len_all_rules ** 2 - intraclass_sum
 
-                    overlap_intraclass_sum += overlap_tmp
-                    
-        f2 = quant_dataframe.dataframe.shape[0] * len_all_rules ** 2 - overlap_intraclass_sum
-
-        return f2
-
-    def f3(self, solution_set: IDSRuleSet) :
-        overlap_interclass_sum = 0
-
+    def f3(self, solution_set: IDSRuleSet):
         quant_dataframe = self.objective_func_params.params["quant_dataframe"]
         len_all_rules = self.objective_func_params.params["len_all_rules"]
 
-        for i, r1 in enumerate(solution_set.ruleset):
-            for j, r2 in enumerate(solution_set.ruleset):
-                if i >= j:
-                    continue
+        indices = self._solution_indices(solution_set)
+        if len(indices) < 2:
+            interclass_sum = 0
+        else:
+            sub_overlap = self.cacher.overlap_matrix[np.ix_(indices, indices)]
+            sub_diff_class = ~self.cacher.same_class_matrix[np.ix_(indices, indices)]
+            interclass_sum = int(np.sum(np.triu(sub_overlap * sub_diff_class, k=1)))
 
-                if r1.car.consequent.value != r2.car.consequent.value:
-                    overlap_tmp = self.cacher.overlap(r1, r2)
-
-                    overlap_interclass_sum += overlap_tmp
-                    
-
-        f3 = quant_dataframe.dataframe.shape[0] * len_all_rules ** 2 - overlap_interclass_sum
-
-        return f3
+        return quant_dataframe.dataframe.shape[0] * len_all_rules ** 2 - interclass_sum
 
     def f4(self, solution_set: IDSRuleSet):
         classes_covered = set()

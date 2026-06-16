@@ -46,65 +46,53 @@ class IDSClassifier:
             raise Exception("Type of quant_dataframe must be QuantitativeDataFrame")
 
         sorted_rules = IDSComparator().sort(self.rules, order_type=order_type)
+        df = quant_dataframe.dataframe
+        n_samples = len(df)
 
-        predicted_classes = []
-    
-        for _, row in quant_dataframe.dataframe.iterrows():
-            appended = False
-            for rule in sorted_rules:
-                antecedent_dict = dict(rule.car.antecedent)
-                counter = True
+        predictions = np.full(n_samples, self.default_class, dtype=object)
+        unassigned = np.ones(n_samples, dtype=bool)
 
-                for name, value in row.items():
-                    if name in antecedent_dict:
-                        rule_value = antecedent_dict[name]
+        for rule in sorted_rules:
+            if not unassigned.any():
+                break
 
-                        counter &= rule_value == value
+            match = np.ones(n_samples, dtype=bool)
+            for col_name, col_value in rule.car.antecedent:
+                match &= df[col_name].values == col_value
 
-                if counter:
-                    _, predicted_class = rule.car.consequent
-                    predicted_classes.append(predicted_class)
+            to_assign = unassigned & match
+            if to_assign.any():
+                _, predicted_class = rule.car.consequent
+                predictions[to_assign] = predicted_class
+                unassigned[to_assign] = False
 
-                    appended = True
-
-                    break
-
-            if not appended:
-                predicted_classes.append(self.default_class)
-
-        return predicted_classes
+        return list(predictions)
 
     def predict_proba(self, quant_dataframe, order_type: str = "f1"):
         if type(quant_dataframe) != QuantitativeDataFrame:
             raise Exception("Type of quant_dataframe must be QuantitativeDataFrame")
 
-        confidences = []
-
         sorted_rules = IDSComparator().sort(self.rules, order_type=order_type)
-    
-        for _, row in quant_dataframe.dataframe.iterrows():
-            appended = False
-            for rule in sorted_rules:
-                antecedent_dict = dict(rule.car.antecedent)  
-                counter = True
+        df = quant_dataframe.dataframe
+        n_samples = len(df)
 
-                for name, value in row.items():
-                    if name in antecedent_dict:
-                        rule_value = antecedent_dict[name]
+        confidences = np.full(n_samples, self.default_class_confidence, dtype=float)
+        unassigned = np.ones(n_samples, dtype=bool)
 
-                        counter &= rule_value == value
+        for rule in sorted_rules:
+            if not unassigned.any():
+                break
 
-                if counter:
-                    confidences.append(rule.car.confidence)
+            match = np.ones(n_samples, dtype=bool)
+            for col_name, col_value in rule.car.antecedent:
+                match &= df[col_name].values == col_value
 
-                    appended = True
+            to_assign = unassigned & match
+            if to_assign.any():
+                confidences[to_assign] = rule.car.confidence
+                unassigned[to_assign] = False
 
-                    break
-
-            if not appended:
-                confidences.append(self.default_class_confidence)
-
-        return confidences
+        return list(confidences)
 
 
 def mine_CARs(df, rule_cutoff, sample=False, random_seed=None, **top_rules_kwargs):
