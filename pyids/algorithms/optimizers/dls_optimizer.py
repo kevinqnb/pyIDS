@@ -8,6 +8,7 @@ class DLSOptimizer:
     def __init__(self, objective_function, objective_func_params, optimizer_args=dict(), random_seed=None):
         self.objective_function_params = objective_func_params
         self.objective_function = objective_function
+        self.n_select = optimizer_args.get("n_select", None)
 
         self.logger = logging.getLogger(DLSOptimizer.__name__)
 
@@ -32,6 +33,12 @@ class DLSOptimizer:
         all_rules = self.objective_function_params.params["all_rules"]
         solution_set = self.optimize_solution_set()
 
+        # When capped by n_select, skip the complement comparison: the complement may contain
+        # far more than n_select rules, so returning it would violate the cap.
+        if self.n_select is not None and len(solution_set.ruleset) >= self.n_select:
+            self.logger.debug(f"Objective value of solution set (capped at n_select={self.n_select}): {self.objective_function.evaluate(solution_set)}")
+            return solution_set.ruleset
+
         all_rules_without_solution_set = IDSRuleSet(all_rules.ruleset - solution_set.ruleset)
 
         func_val1 = self.objective_function.evaluate(solution_set)
@@ -55,6 +62,9 @@ class DLSOptimizer:
 
         soln_set_objective_value = self.objective_function.evaluate(soln_set)
 
+        if self.n_select is not None and len(soln_set.ruleset) >= self.n_select:
+            return soln_set
+
         restart_computations = False
 
         while True:
@@ -70,6 +80,10 @@ class DLSOptimizer:
                     restart_computations = True
 
                     self.logger.debug(f"Adding to the solution set rule {rule}")
+
+                    if self.n_select is not None and len(soln_set.ruleset) >= self.n_select:
+                        return soln_set
+
                     break
 
             if restart_computations:

@@ -69,7 +69,7 @@ class IDS:
             objective_function,
             params,
             random_seed=random_seed,
-            optimizer_args=optimizer_args
+            optimizer_args={**optimizer_args, "n_select": self.n_select}
         )
 
         solution_set = optimizer.optimize()
